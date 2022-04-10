@@ -21,6 +21,7 @@ namespace karmac {
         void parse_operator(uint64_t& unicode, Utf8Iterator& iterator);
     public:
         Tokenizer(const std::string_view& source);
+        ~Tokenizer();
 
         [[nodiscard]] inline const std::vector<Token*>& get_tokens() const noexcept {
             return _tokens;

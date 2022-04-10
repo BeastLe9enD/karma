@@ -94,6 +94,7 @@ namespace karmac {
         size_t _line_offset;
     public:
         Token(size_t line, size_t line_offset) noexcept : _line(line), _line_offset(line_offset) {}
+        virtual ~Token() {}
 
         [[nodiscard]] virtual TokenType get_type() const noexcept = 0;
         [[nodiscard]] virtual std::string_view to_string() const noexcept = 0;

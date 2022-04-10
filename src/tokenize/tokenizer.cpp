@@ -481,4 +481,10 @@ namespace karmac {
             //TODO: throw exception with pending brackets
         }
     }
+
+    Tokenizer::~Tokenizer() {
+        for(const auto* token : _tokens) {
+            delete token;
+        }
+    }
 }
