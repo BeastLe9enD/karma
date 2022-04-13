@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstdlib>
+#include "../util/text/line_offset.hpp"
+#include "../util/text/utf8_iterator.hpp"
 #include <string>
-#include <string_view>
 
 namespace karmac {
     enum class TokenType {
@@ -90,17 +90,15 @@ namespace karmac {
 
     class Token {
     protected:
-        size_t _line;
-        size_t _line_offset;
+        LineOffset _line_offset;
     public:
-        Token(size_t line, size_t line_offset) noexcept : _line(line), _line_offset(line_offset) {}
-        virtual ~Token() {}
+        Token(LineOffset line_offset) noexcept : _line_offset(line_offset) {}
+        explicit Token(const Utf8Iterator& iterator) noexcept : _line_offset(iterator.get_line_offset()) {}
 
         [[nodiscard]] virtual TokenType get_type() const noexcept = 0;
         [[nodiscard]] virtual std::string_view to_string() const noexcept = 0;
 
-        [[nodiscard]] size_t get_line() const noexcept { return _line; }
-        [[nodiscard]] size_t get_line_offset() const noexcept { return _line_offset; }
+        [[nodiscard]] inline LineOffset get_line_offset() const noexcept { return _line_offset; }
     };
 
     class SimpleToken final : public Token {
@@ -110,7 +108,8 @@ namespace karmac {
         size_t _line_offset;
 
     public:
-        SimpleToken(TokenType type, size_t line, size_t line_offset) noexcept : _type(type), Token(line, line_offset) {}
+        SimpleToken(TokenType type, LineOffset line_offset) noexcept : _type(type), Token(line_offset) {}
+        SimpleToken(TokenType type, const Utf8Iterator& iterator) noexcept : _type(type), Token(iterator) {}
 
         [[nodiscard]] TokenType get_type() const noexcept final { return _type; }
         [[nodiscard]] std::string_view to_string() const noexcept final { return token_type::to_string(_type); }
@@ -121,8 +120,10 @@ namespace karmac {
         std::string _identifier;
 
     public:
-        IdentifierToken(std::string identifier, size_t line, size_t line_offset) noexcept
-            : _identifier(std::move(identifier)), Token(line, line_offset) {}
+        IdentifierToken(std::string identifier, LineOffset line_offset) noexcept
+            : _identifier(std::move(identifier)), Token(line_offset) {}
+        IdentifierToken(std::string identifier, const Utf8Iterator& iterator) noexcept
+            : _identifier(std::move(identifier)), Token(iterator) {}
 
         [[nodiscard]] TokenType get_type() const noexcept final { return TokenType::Identifier; }
         [[nodiscard]] std::string_view to_string() const noexcept final { return _identifier; }
@@ -135,7 +136,8 @@ namespace karmac {
         std::string _value_str;
 
     public:
-        LiteralToken(T value, size_t line, size_t line_offset) noexcept : _value(value), _value_str(std::to_string(value)), Token(line, line_offset) {}
+        LiteralToken(T value, LineOffset line_offset) noexcept : _value(value), _value_str(std::to_string(value)), Token(line_offset) {}
+        LiteralToken(T value, const Utf8Iterator& iterator) noexcept : _value(value), _value_str(std::to_string(value)), Token(iterator) {}
 
         [[nodiscard]] TokenType get_type() const noexcept final { return Type; }
 
@@ -149,7 +151,8 @@ namespace karmac {
         std::string _value;
 
     public:
-        StringLiteralToken(std::string value, size_t line, size_t line_offset) noexcept : _value(std::move(value)), Token(line, line_offset) {}
+        StringLiteralToken(std::string value, LineOffset line_offset) noexcept : _value(std::move(value)), Token(line_offset) {}
+        StringLiteralToken(std::string value, const Utf8Iterator& iterator) noexcept : _value(std::move(value)), Token(iterator) {}
 
         [[nodiscard]] TokenType get_type() const noexcept final { return TokenType::StringLiteral; }
 

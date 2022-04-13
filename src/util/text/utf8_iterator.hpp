@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../assert.hpp"
+#include "line_offset.hpp"
 #include "utf8.hpp"
 #include <stack>
 #include <string_view>
@@ -13,8 +14,12 @@ namespace karmac {
         using value_type = uint64_t;
 
     private:
+        static const size_t _TAB_SIZE = 4;
+
         const char* _head = nullptr;
         std::stack<size_t> _last_offsets;
+        std::stack<size_t> _last_line_offsets;
+        size_t _current_line_offset = 0;
     public:
         explicit Utf8Iterator(const char* p) noexcept : _head(p) {
             karmac_assert(p);
@@ -42,14 +47,41 @@ namespace karmac {
             return true;
         }
 
+        [[nodiscard]] inline LineOffset get_line_offset() const noexcept {
+            return {_last_line_offsets.size(), _current_line_offset };
+        }
+
         [[nodiscard]] value_type inline operator *() const noexcept {
             return utf8::to_unicode(_head);
         }
 
         inline Utf8Iterator& operator ++() noexcept {
             const auto len = utf8::num_chars(_head);
+            const auto current = *(*this);
+
+            switch(current) {
+                case '\t':
+                    _current_line_offset += _TAB_SIZE;
+                    break;
+                case '\b':
+                    karmac_unimplemented();
+                    break;
+                case '\r':
+                    karmac_unimplemented();
+                    break;
+                case '\n':
+                    _last_line_offsets.push(_current_line_offset);
+                    _current_line_offset = 0;
+                    break;
+
+                default:
+                    ++_current_line_offset;
+                    break;
+            }
+
             _last_offsets.push(len);
             _head += len;
+
             return *this;
         }
 
@@ -72,6 +104,26 @@ namespace karmac {
             _last_offsets.pop();
 
             _head -= len;
+
+            const auto current = *(*this);
+            switch(current) {
+                case '\t':
+                    _current_line_offset -= _TAB_SIZE;
+                    break;
+                case '\b':
+                    karmac_unimplemented();
+                    break;
+                case '\r':
+                    karmac_unimplemented();
+                    break;
+                case '\n':
+                    _current_line_offset = _last_line_offsets.top();
+                    _last_line_offsets.pop();
+                    break;
+                default:
+                    --_current_line_offset;
+                    break;
+            }
 
             return *this;
         }

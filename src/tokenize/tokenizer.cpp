@@ -1,5 +1,4 @@
 #include "tokenizer.hpp"
-#include "../util/text/utf8_iterator.hpp"
 #include "../util/text/character.hpp"
 #include <optional>
 #include <stdexcept>
@@ -17,8 +16,10 @@ namespace karmac {
         { "return", TokenType::Return }
     };
 
-    void Tokenizer::parse_identifier(uint64_t& unicode, Utf8Iterator& iterator) noexcept {
+    void Tokenizer::parse_identifier(uint64_t unicode, Utf8Iterator& iterator) noexcept {
         std::string identifier;
+
+        const auto line_offset = iterator.get_line_offset();
 
         char buffer[7];
         while(character::is_identifier(*iterator)) {
@@ -30,9 +31,9 @@ namespace karmac {
 
         const auto keyword_iter = _keywords.find(identifier);
         if(keyword_iter == _keywords.end()) {
-            _tokens.push_back(new IdentifierToken(std::move(identifier), 0, 0));
+            _tokens.push_back(new IdentifierToken(std::move(identifier), line_offset));
         } else {
-            _tokens.push_back(new SimpleToken(keyword_iter->second, 0, 0));
+            _tokens.push_back(new SimpleToken(keyword_iter->second, line_offset));
         }
     }
 
@@ -136,7 +137,9 @@ namespace karmac {
         return value;
     }
 
-    void Tokenizer::parse_number(uint64_t& unicode, Utf8Iterator& iterator) {
+    void Tokenizer::parse_number(uint64_t unicode, Utf8Iterator& iterator) {
+        const auto line_offset = iterator.get_line_offset();
+
         if(unicode == static_cast<uint64_t>('0')) {
 
             if(iterator.has_chars()) {
@@ -147,21 +150,21 @@ namespace karmac {
                     case 'B': {
                         ++iterator;
                         const auto value = parse_bin_literal(iterator);
-                        _tokens.push_back(new U64LiteralToken(value, 0, 0));
+                        _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
                     case 'o':
                     case 'O': {
                         ++iterator;
                         const auto value = parse_oct_literal(iterator);
-                        _tokens.push_back(new U64LiteralToken(value, 0, 0));
+                        _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
                     case 'x':
                     case 'X': {
                         ++iterator;
                         const auto value = parse_hex_literal(iterator);
-                        _tokens.push_back(new U64LiteralToken(value, 0, 0));
+                        _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
                     default:
@@ -171,14 +174,14 @@ namespace karmac {
         }
     }
 
-    void Tokenizer::parse_operator(uint64_t& unicode, Utf8Iterator& iterator) {
+    void Tokenizer::parse_operator(uint64_t unicode, Utf8Iterator& iterator) {
         switch(unicode) {
             case '!':
                 if(iterator.has_chars() && iterator[1] == '=') {
-                    _tokens.push_back(new SimpleToken(TokenType::NotEquals, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::NotEquals, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Not, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Not, iterator));
                 }
                 break;
             case '"':
@@ -186,35 +189,37 @@ namespace karmac {
                 break;
             case '%':
                 if(iterator.has_chars() && iterator[1] == '=') {
+                    _tokens.push_back(new SimpleToken(TokenType::ModAssign, iterator));
                     ++iterator;
-                    _tokens.push_back(new SimpleToken(TokenType::ModAssign, 0, 0));
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Mod, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Mod, iterator));
                 }
                 break;
             case '&':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '&':
-                            _tokens.push_back(new SimpleToken(TokenType::Conjunction, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Conjunction, line_offset));
                             break;
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::AndAssign, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::AndAssign, line_offset));
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::And, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::And, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::And, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::And, iterator));
                 }
                 break;
             case '(':
                 _pending_brackets.push(')');
-                _tokens.push_back(new SimpleToken(TokenType::LeftBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::LeftBracket, iterator));
                 break;
             case ')': {
                 if(_pending_brackets.empty()) {
@@ -228,154 +233,162 @@ namespace karmac {
                     throw std::runtime_error("Invalid closing bracket: )");
                 }
 
-                _tokens.push_back(new SimpleToken(TokenType::RightBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::RightBracket, iterator));
             }
                 break;
             case '*':
                 if(iterator.has_chars() && iterator[1] == '=') {
-                    _tokens.push_back(new SimpleToken(TokenType::MulAssign, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::MulAssign, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Mul, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Mul, iterator));
                 }
                 break;
             case '+':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '+':
-                            _tokens.push_back(new SimpleToken(TokenType::Increment, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Increment, line_offset));
                             break;
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::AddAssign, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::AddAssign, line_offset));
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::Add, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Add, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Add, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Add, iterator));
                 }
                 break;
             case ',':
-                _tokens.push_back(new SimpleToken(TokenType::Comma, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::Comma, iterator));
                 break;
             case '-':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '-':
-                            _tokens.push_back(new SimpleToken(TokenType::Decrement, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Decrement, line_offset));
                             break;
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::SubAssign, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::SubAssign, line_offset));
                             break;
                         case '>':
-                            _tokens.push_back(new SimpleToken(TokenType::Arrow, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Arrow, line_offset));
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::Sub, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Sub, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Sub, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Sub, iterator));
                 }
                 break;
             case '.':
                 if(iterator.has_chars() && iterator[1] == '.') {
-                    _tokens.push_back(new SimpleToken(TokenType::DoubleDot, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::DoubleDot, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Dot, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Dot, iterator));
                 }
                 break;
             case '/':
                 if(iterator.has_chars() && iterator[1] == '=') {
-                    _tokens.push_back(new SimpleToken(TokenType::DivAssign, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::DivAssign, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Div, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Div, iterator));
                 }
                 break;
             case ':':
                 if(iterator.has_chars() && iterator[1] == ':') {
-                    _tokens.push_back(new SimpleToken(TokenType::DoubleColon, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::DoubleColon, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Colon, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Colon, iterator));
                 }
                 break;
             case ';':
-                _tokens.push_back(new SimpleToken(TokenType::Semicolon, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::Semicolon, iterator));
                 break;
             case '<':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '<':
                             if(iterator.has_chars() && iterator[1] == '=') {
-                                _tokens.push_back(new SimpleToken(TokenType::LeftShiftAssign, 0, 0));
+                                _tokens.push_back(new SimpleToken(TokenType::LeftShiftAssign, line_offset));
                                 ++iterator;
                             } else {
-                                _tokens.push_back(new SimpleToken(TokenType::LeftShift, 0, 0));
+                                _tokens.push_back(new SimpleToken(TokenType::LeftShift, line_offset));
                             }
                             break;
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::LessEquals, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::LessEquals, line_offset));
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::Less, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Less, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Less, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Less, iterator));
                 }
                 break;
             case '=':
                 if(iterator.has_chars() && iterator[1] == '=') {
-                    _tokens.push_back(new SimpleToken(TokenType::Equals, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Equals, iterator));
                     ++iterator;
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Assign, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Assign, iterator));
                 }
                 break;
             case '>':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::GreaterEquals, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::GreaterEquals, line_offset));
                             break;
                         case '>':
                             if(iterator.has_chars() && iterator[1] == '=') {
-                                _tokens.push_back(new SimpleToken(TokenType::RightShiftAssign, 0, 0));
+                                _tokens.push_back(new SimpleToken(TokenType::RightShiftAssign, line_offset));
                                 ++iterator;
                             } else {
-                                _tokens.push_back(new SimpleToken(TokenType::RightShift, 0, 0));
+                                _tokens.push_back(new SimpleToken(TokenType::RightShift, line_offset));
                             }
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::Greater, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Greater, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Greater, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Greater, iterator));
                 }
                 break;
             case '?':
-                _tokens.push_back(new SimpleToken(TokenType::QuestionMark, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::QuestionMark, iterator));
                 break;
             case '[':
                 _pending_brackets.push(']');
-                _tokens.push_back(new SimpleToken(TokenType::LeftSquareBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::LeftSquareBracket, iterator));
                 break;
             case ']': {
                 if(_pending_brackets.empty()) {
@@ -389,39 +402,41 @@ namespace karmac {
                     throw std::runtime_error("Invalid closing bracket: ]");
                 }
 
-                _tokens.push_back(new SimpleToken(TokenType::RightSquareBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::RightSquareBracket, iterator));
             }
                 break;
             case '^':
                 if(iterator.has_chars() && iterator[1] == '=') {
+                    _tokens.push_back(new SimpleToken(TokenType::XorAssign, iterator));
                     ++iterator;
-                    _tokens.push_back(new SimpleToken(TokenType::XorAssign, 0, 0));
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Xor, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Xor, iterator));
                 }
                 break;
             case '{':
                 _pending_brackets.push('}');
-                _tokens.push_back(new SimpleToken(TokenType::LeftCurlyBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::LeftCurlyBracket, iterator));
                 break;
             case '|':
                 if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
                     unicode = *++iterator;
 
                     switch(unicode) {
                         case '|':
-                            _tokens.push_back(new SimpleToken(TokenType::Disjunction, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Disjunction, line_offset));
                             break;
                         case '=':
-                            _tokens.push_back(new SimpleToken(TokenType::OrAssign, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::OrAssign, line_offset));
                             break;
                         default:
                             --iterator;
-                            _tokens.push_back(new SimpleToken(TokenType::Or, 0, 0));
+                            _tokens.push_back(new SimpleToken(TokenType::Or, line_offset));
                             break;
                     }
                 } else {
-                    _tokens.push_back(new SimpleToken(TokenType::Or, 0, 0));
+                    _tokens.push_back(new SimpleToken(TokenType::Or, iterator));
                 }
                 break;
             case '}': {
@@ -436,7 +451,7 @@ namespace karmac {
                     throw std::runtime_error("Invalid closing bracket: }");
                 }
 
-                _tokens.push_back(new SimpleToken(TokenType::RightCurlyBracket, 0, 0));
+                _tokens.push_back(new SimpleToken(TokenType::RightCurlyBracket, iterator));
             }
                 break;
             default: {
@@ -479,12 +494,6 @@ namespace karmac {
 
         if(!_pending_brackets.empty()) {
             //TODO: throw exception with pending brackets
-        }
-    }
-
-    Tokenizer::~Tokenizer() {
-        for(const auto* token : _tokens) {
-            delete token;
         }
     }
 }
