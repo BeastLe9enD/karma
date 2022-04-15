@@ -36,9 +36,9 @@ namespace karmac::character {
 
     [[nodiscard]] inline bool is_number_start(uint64_t ch) noexcept {
         return is_dec_digit(ch)
-            || ch == static_cast<uint64_t>('+')
+            /*|| ch == static_cast<uint64_t>('+')
             || ch == static_cast<uint64_t>('-')
-            || ch == static_cast<uint64_t>('.');
+            || ch == static_cast<uint64_t>('.')*/;
     }
 
     [[nodiscard]] inline bool is_letter(uint64_t ch) noexcept {

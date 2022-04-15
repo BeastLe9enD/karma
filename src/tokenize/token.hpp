@@ -1,93 +1,11 @@
 #pragma once
 
+#include "token_type.hpp"
 #include "../util/text/line_offset.hpp"
 #include "../util/text/utf8_iterator.hpp"
 #include <string>
 
 namespace karmac {
-    enum class TokenType {
-        //Brackets
-        LeftBracket,
-        RightBracket,
-        LeftSquareBracket,
-        RightSquareBracket,
-        LeftCurlyBracket,
-        RightCurlyBracket,
-
-        //Operators
-        Dot,
-        DoubleDot,
-        Comma,
-        Colon,
-        DoubleColon,
-        Semicolon,
-        Assign,
-        Not,
-        Arrow,
-        QuestionMark,
-        Less,
-        LessEquals,
-        Greater,
-        GreaterEquals,
-        Equals,
-        NotEquals,
-        Conjunction,
-        Disjunction,
-        And,
-        AndAssign,
-        Or,
-        OrAssign,
-        Xor,
-        XorAssign,
-        LeftShift,
-        LeftShiftAssign,
-        RightShift,
-        RightShiftAssign,
-        Increment,
-        Decrement,
-        Add,
-        AddAssign,
-        Sub,
-        SubAssign,
-        Mul,
-        MulAssign,
-        Div,
-        DivAssign,
-        Mod,
-        ModAssign,
-
-        //Keywords
-        Identifier,
-        Fn,
-        If,
-        Else,
-        For,
-        While,
-        Break,
-        Continue,
-        Return,
-
-        //Literals
-        U8Literal,
-        I8Literal,
-        U16Literal,
-        I16Literal,
-        U32Literal,
-        I32Literal,
-        U64Literal,
-        I64Literal,
-        USizeLiteral,
-        ISizeLiteral,
-        F32Literal,
-        F64Literal,
-        StringLiteral
-    };
-
-    namespace token_type {
-        [[nodiscard]] std::string_view get_name(TokenType type) noexcept;
-        [[nodiscard]] std::string_view to_string(TokenType type) noexcept;
-    }
-
     class Token {
     protected:
         LineOffset _line_offset;
@@ -104,8 +22,6 @@ namespace karmac {
     class SimpleToken final : public Token {
     private:
         TokenType _type;
-        size_t _line;
-        size_t _line_offset;
 
     public:
         SimpleToken(TokenType type, LineOffset line_offset) noexcept : _type(type), Token(line_offset) {}

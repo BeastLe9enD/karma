@@ -20,6 +20,7 @@ namespace karmac {
         std::stack<size_t> _last_offsets;
         std::stack<size_t> _last_line_offsets;
         size_t _current_line_offset = 0;
+        size_t _current_line = 0;
     public:
         explicit Utf8Iterator(const char* p) noexcept : _head(p) {
             karmac_assert(p);
@@ -48,7 +49,7 @@ namespace karmac {
         }
 
         [[nodiscard]] inline LineOffset get_line_offset() const noexcept {
-            return {_last_line_offsets.size(), _current_line_offset };
+            return {_current_line, _current_line_offset };
         }
 
         [[nodiscard]] value_type inline operator *() const noexcept {
@@ -67,11 +68,13 @@ namespace karmac {
                     karmac_unimplemented();
                     break;
                 case '\r':
-                    karmac_unimplemented();
+                    _last_line_offsets.push(_current_line_offset);
+                    _current_line_offset = 0;
                     break;
                 case '\n':
                     _last_line_offsets.push(_current_line_offset);
                     _current_line_offset = 0;
+                    ++_current_line;
                     break;
 
                 default:
@@ -114,11 +117,13 @@ namespace karmac {
                     karmac_unimplemented();
                     break;
                 case '\r':
-                    karmac_unimplemented();
+                    _current_line_offset = _last_line_offsets.top();
+                    _last_line_offsets.pop();
                     break;
                 case '\n':
                     _current_line_offset = _last_line_offsets.top();
                     _last_line_offsets.pop();
+                    --_current_line;
                     break;
                 default:
                     --_current_line_offset;

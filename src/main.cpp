@@ -31,7 +31,7 @@ int main() {
 
     const karmac::Tokenizer tokenizer(text);
     for(const auto* token : tokenizer.get_tokens()) {
-        std::cout << karmac::token_type::get_name(token->get_type()) << ':' << token->to_string() << std::endl;
+        std::cout << '[' << token->get_line_offset().line << ':' << token->get_line_offset().offset << "] " << karmac::token_type::get_name(token->get_type()) << ':' << token->to_string() << std::endl;
     }
 
     return 0;

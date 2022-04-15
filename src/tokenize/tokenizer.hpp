@@ -8,16 +8,14 @@ namespace karmac {
     class Utf8Iterator;
     class Tokenizer final {
     private:
-        enum class State {
-            Default
-        };
-
-        State _state = State::Default;
-        std::stack<uint64_t> _pending_brackets;
+        std::stack<uint64_t> _pending_tokens;
         std::vector<Token*> _tokens;
 
         void parse_identifier(uint64_t unicode, Utf8Iterator& iterator) noexcept;
         void parse_number(uint64_t unicode, Utf8Iterator& iterator);
+        void parse_string(Utf8Iterator& iterator);
+        void parse_line_comment(Utf8Iterator& iterator);
+        void parse_multiline_comment(Utf8Iterator& iterator);
         void parse_operator(uint64_t unicode, Utf8Iterator& iterator);
     public:
         Tokenizer(const std::string_view& source);

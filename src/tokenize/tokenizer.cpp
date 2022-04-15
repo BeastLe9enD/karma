@@ -60,7 +60,7 @@ namespace karmac {
         }
 
         for(auto i = 0; i < literal.length(); i++) {
-            if(literal[i] == '1') {
+            if(literal[i] == static_cast<uint64_t>('1')) {
                 value += 1 << (literal.length() - i - 1);
             }
         }
@@ -149,21 +149,21 @@ namespace karmac {
                     case 'b':
                     case 'B': {
                         ++iterator;
-                        const auto value = parse_bin_literal(iterator);
+                        const auto value = parse_bin_literal(iterator); //TODO:
                         _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
                     case 'o':
                     case 'O': {
                         ++iterator;
-                        const auto value = parse_oct_literal(iterator);
+                        const auto value = parse_oct_literal(iterator); //TODO:
                         _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
                     case 'x':
                     case 'X': {
                         ++iterator;
-                        const auto value = parse_hex_literal(iterator);
+                        const auto value = parse_hex_literal(iterator); //TODO:
                         _tokens.push_back(new U64LiteralToken(value, line_offset));
                     }
                         break;
@@ -172,6 +172,94 @@ namespace karmac {
                 }
             }
         }
+    }
+
+    static inline void parse_string_literal(Utf8Iterator& iterator, std::string& literal) {
+        char buffer[7];
+
+        while(iterator.has_chars()) {
+            auto current = *iterator;
+            switch(current) {
+                case static_cast<uint64_t>('"'):
+                    ++iterator;
+                    return;
+                case static_cast<uint64_t>('\\'): {
+                    if(!iterator.has_chars()) {
+                        throw std::runtime_error("Invalid token: \\");
+                    }
+
+                    current = *++iterator;
+                    switch(current) {
+                        case static_cast<uint64_t>('"'):
+                            literal += '"';
+                            break;
+                        case static_cast<uint64_t>('0'):
+                            literal += '\0';
+                            break;
+                        case static_cast<uint64_t>('b'):
+                            literal += '\b';
+                            break;
+                        case static_cast<uint64_t>('f'):
+                            literal += '\f';
+                            break;
+                        case static_cast<uint64_t>('n'):
+                            literal += '\n';
+                            break;
+                        case static_cast<uint64_t>('r'):
+                            literal += '\r';
+                            break;
+                        case static_cast<uint64_t>('t'):
+                            literal += '\t';
+                            break;
+                        case static_cast<uint64_t>('u'):
+                            karmac_unimplemented();
+                            break;
+                        case static_cast<uint64_t>('v'):
+                            literal += '\v';
+                            break;
+                        case static_cast<uint64_t>('\\'):
+                            literal += '\\';
+                            break;
+                        default:
+                            throw std::runtime_error("Invalid token: TODO");
+                    }
+                }
+                    break;
+                default:
+                    utf8::from_unicode(current, buffer);
+                    literal += buffer;
+                    break;
+            }
+
+            ++iterator;
+        }
+
+        throw std::runtime_error("Invalid token, expected \"");
+    }
+
+    void Tokenizer::parse_string(Utf8Iterator& iterator) {
+        ++iterator;
+
+        const auto line_offset = iterator.get_line_offset();
+
+        std::string literal;
+        parse_string_literal(iterator, literal);
+
+        _tokens.push_back(new StringLiteralToken(std::move(literal), line_offset)); //TODO: check if line offset is correct here
+    }
+
+    void Tokenizer::parse_line_comment(Utf8Iterator& iterator) {
+        while(iterator.has_chars()) {
+            if(*iterator == static_cast<uint64_t>('\n')) {
+                break;
+            }
+
+            ++iterator;
+        }
+    }
+
+    void Tokenizer::parse_multiline_comment(Utf8Iterator& iterator) {
+        karmac_unimplemented();
     }
 
     void Tokenizer::parse_operator(uint64_t unicode, Utf8Iterator& iterator) {
@@ -183,9 +271,6 @@ namespace karmac {
                 } else {
                     _tokens.push_back(new SimpleToken(TokenType::Not, iterator));
                 }
-                break;
-            case '"':
-                karmac_unimplemented();
                 break;
             case '%':
                 if(iterator.has_chars() && iterator[1] == '=') {
@@ -218,16 +303,16 @@ namespace karmac {
                 }
                 break;
             case '(':
-                _pending_brackets.push(')');
+                _pending_tokens.push(')');
                 _tokens.push_back(new SimpleToken(TokenType::LeftBracket, iterator));
                 break;
             case ')': {
-                if(_pending_brackets.empty()) {
+                if(_pending_tokens.empty()) {
                     throw std::runtime_error("Invalid closing bracket: )");
                 }
 
-                const auto last_bracket = _pending_brackets.top();
-                _pending_brackets.pop();
+                const auto last_bracket = _pending_tokens.top();
+                _pending_tokens.pop();
 
                 if(last_bracket != ')') {
                     throw std::runtime_error("Invalid closing bracket: )");
@@ -303,9 +388,26 @@ namespace karmac {
                 }
                 break;
             case '/':
-                if(iterator.has_chars() && iterator[1] == '=') {
-                    _tokens.push_back(new SimpleToken(TokenType::DivAssign, iterator));
-                    ++iterator;
+                if(iterator.has_chars()) {
+                    const auto line_offset = iterator.get_line_offset();
+
+                    unicode = *++iterator;
+
+                    switch(unicode) {
+                        case '*':
+                            parse_multiline_comment(iterator);
+                            break;
+                        case '/':
+                            parse_line_comment(iterator);
+                            break;
+                        case '=':
+                            _tokens.push_back(new SimpleToken(TokenType::DivAssign, line_offset));
+                            break;
+                        default:
+                            --iterator;
+                            _tokens.push_back(new SimpleToken(TokenType::Div, line_offset));
+                            break;
+                    }
                 } else {
                     _tokens.push_back(new SimpleToken(TokenType::Div, iterator));
                 }
@@ -387,16 +489,16 @@ namespace karmac {
                 _tokens.push_back(new SimpleToken(TokenType::QuestionMark, iterator));
                 break;
             case '[':
-                _pending_brackets.push(']');
+                _pending_tokens.push(']');
                 _tokens.push_back(new SimpleToken(TokenType::LeftSquareBracket, iterator));
                 break;
             case ']': {
-                if(_pending_brackets.empty()) {
+                if(_pending_tokens.empty()) {
                     throw std::runtime_error("Invalid closing bracket: ]");
                 }
 
-                const auto last_bracket = _pending_brackets.top();
-                _pending_brackets.pop();
+                const auto last_bracket = _pending_tokens.top();
+                _pending_tokens.pop();
 
                 if(last_bracket != ']') {
                     throw std::runtime_error("Invalid closing bracket: ]");
@@ -414,7 +516,7 @@ namespace karmac {
                 }
                 break;
             case '{':
-                _pending_brackets.push('}');
+                _pending_tokens.push('}');
                 _tokens.push_back(new SimpleToken(TokenType::LeftCurlyBracket, iterator));
                 break;
             case '|':
@@ -440,12 +542,12 @@ namespace karmac {
                 }
                 break;
             case '}': {
-                if(_pending_brackets.empty()) {
+                if(_pending_tokens.empty()) {
                     throw std::runtime_error("Invalid closing bracket: }");
                 }
 
-                const auto last_bracket = _pending_brackets.top();
-                _pending_brackets.pop();
+                const auto last_bracket = _pending_tokens.top();
+                _pending_tokens.pop();
 
                 if(last_bracket != '}') {
                     throw std::runtime_error("Invalid closing bracket: }");
@@ -464,7 +566,6 @@ namespace karmac {
 
                 throw std::runtime_error(message);
             }
-                break;
         }
     }
 
@@ -472,9 +573,14 @@ namespace karmac {
         Utf8Iterator iterator(source.data());
 
         while(iterator.has_chars()) {
-            character::skip_whitespace(iterator); //TODO: do line thing
+            character::skip_whitespace(iterator);
 
             auto unicode = *iterator;
+
+            if(unicode == static_cast<uint64_t>('"')) {
+                parse_string(iterator);
+                continue;
+            }
 
             if(character::is_identifier_start(unicode)) {
                 parse_identifier(unicode, iterator);
@@ -486,14 +592,13 @@ namespace karmac {
                 continue;
             }
 
-
             parse_operator(unicode, iterator);
 
             ++iterator;
         }
 
-        if(!_pending_brackets.empty()) {
-            //TODO: throw exception with pending brackets
+        if(!_pending_tokens.empty()) {
+            throw std::runtime_error("Pending tokens must not be empty");
         }
     }
 }
