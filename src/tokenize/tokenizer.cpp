@@ -249,6 +249,8 @@ namespace karmac {
     }
 
     void Tokenizer::parse_line_comment(Utf8Iterator& iterator) {
+        ++iterator;
+
         while(iterator.has_chars()) {
             if(*iterator == static_cast<uint64_t>('\n')) {
                 break;
@@ -259,7 +261,36 @@ namespace karmac {
     }
 
     void Tokenizer::parse_multiline_comment(Utf8Iterator& iterator) {
-        karmac_unimplemented();
+        ++iterator;
+
+        size_t num_tokens = 1;
+
+        while(iterator.has_chars()) {
+            const auto current = *iterator;
+
+            switch(current) {
+                case static_cast<uint64_t>('*'):
+                    if(iterator[1] == static_cast<uint64_t>('/')) {
+                        ++iterator;
+                        if(--num_tokens == 0) {
+                            return;
+                        }
+                    }
+                    break;
+                case static_cast<uint64_t>('/'):
+                    if(iterator[1] == static_cast<uint64_t>('*')) {
+                        ++num_tokens;
+                        ++iterator;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            ++iterator;
+        }
+
+        throw std::runtime_error("Invalid token, expected */");
     }
 
     void Tokenizer::parse_operator(uint64_t unicode, Utf8Iterator& iterator) {

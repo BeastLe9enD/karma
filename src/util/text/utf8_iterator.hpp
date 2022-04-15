@@ -16,14 +16,23 @@ namespace karmac {
     private:
         static const size_t _TAB_SIZE = 4;
 
-        const char* _head = nullptr;
+        const char* _start;
+        const char* _head;
         std::stack<size_t> _last_offsets;
         std::stack<size_t> _last_line_offsets;
-        size_t _current_line_offset = 0;
-        size_t _current_line = 0;
+        size_t _current_line_offset;
+        size_t _current_line;
     public:
-        explicit Utf8Iterator(const char* p) noexcept : _head(p) {
+        explicit Utf8Iterator(const char* p) noexcept : _start(p), _head(p), _current_line_offset(0), _current_line(0) {
             karmac_assert(p);
+        }
+
+        inline void clear() {
+            _head = _start;
+            _last_offsets = std::stack<size_t>();
+            _last_line_offsets = std::stack<size_t>();
+            _current_line_offset = 0;
+            _current_line = 0;
         }
 
         [[nodiscard]] inline Utf8Iterator copy() const noexcept {

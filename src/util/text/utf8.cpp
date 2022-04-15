@@ -52,8 +52,8 @@ namespace karmac::utf8 {
         throw std::runtime_error("Invalid unicode!");
     }
 
-    uint64_t to_unicode(const char* p) {
-        const auto len = num_chars(p);
+    uint64_t to_unicode(const char* p, size_t& len) {
+        len = num_chars(p);
 
         uint64_t unicode;
         switch(len) {
@@ -95,8 +95,8 @@ namespace karmac::utf8 {
         return unicode;
     }
 
-    void from_unicode(uint64_t unicode, char* buffer) {
-        const auto len = num_chars(unicode);
+    void from_unicode(uint64_t unicode, char* buffer, size_t& len) {
+        len = num_chars(unicode);
         buffer[len] = '\0';
 
         switch(len) {
