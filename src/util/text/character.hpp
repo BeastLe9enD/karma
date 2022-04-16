@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utf8_iterator.hpp"
 #include <cstdint>
 
 namespace karmac::character {
@@ -36,9 +35,9 @@ namespace karmac::character {
 
     [[nodiscard]] inline bool is_number_start(uint64_t ch) noexcept {
         return is_dec_digit(ch)
-            /*|| ch == static_cast<uint64_t>('+')
+            || ch == static_cast<uint64_t>('+')
             || ch == static_cast<uint64_t>('-')
-            || ch == static_cast<uint64_t>('.')*/;
+            || ch == static_cast<uint64_t>('.');
     }
 
     [[nodiscard]] inline bool is_letter(uint64_t ch) noexcept {
@@ -52,11 +51,5 @@ namespace karmac::character {
 
     [[nodiscard]] inline bool is_identifier(uint64_t ch) noexcept {
         return is_identifier_start(ch) || is_dec_digit(ch);
-    }
-
-    inline void skip_whitespace(Utf8Iterator& iterator) noexcept {
-        while(is_whitespace(*iterator)) {
-            ++iterator;
-        }
     }
 }
